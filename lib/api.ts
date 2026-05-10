@@ -61,3 +61,23 @@ export async function fetchYearlyTrends(): Promise<YearlyData[]> {
   if (!res.ok) throw new Error("Failed to fetch yearly trends");
   return res.json();
 }
+export interface MessageInsight {
+  id: string;
+  department: string;
+  emotion: string;
+  employeeCount: number;
+  date: string;
+  themes: string[];
+  aiAnalysis: string;
+  responded: boolean;
+  message: string;
+  response?: string;
+}
+
+export async function fetchMessages(): Promise<MessageInsight[]> {
+  const res = await fetch(`${BASE_URL}/api/hr/messages`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to fetch messages");
+  return res.json();
+}
