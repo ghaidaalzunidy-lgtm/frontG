@@ -1,6 +1,18 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import {
+  fetchStats,
+  fetchDepartments,
+  fetchMonthlyTrends,
+  fetchMoodDistribution,
+  fetchYearlyTrends,
+  type DepartmentData,
+  type MonthlyData,
+  type MoodData,
+  type YearlyData,
+  type StatsData,
+} from "@/lib/api";
 import { motion } from "framer-motion";
 import {
   LayoutDashboard,
@@ -32,73 +44,6 @@ import {
   Legend,
 } from "recharts";
 
-const departmentData = [
-  { name: "Accounting", messages: 15, employees: 23 },
-  { name: "Maintenance", messages: 18, employees: 22 },
-  { name: "HR", messages: 8, employees: 12 },
-  { name: "IT", messages: 28, employees: 31 },
-  { name: "Sales", messages: 26, employees: 35 },
-  { name: "Marketing", messages: 14, employees: 16 },
-];
-
-const monthlyData = [
-  { month: "Jan", score: 3.2 },
-  { month: "Feb", score: 3.3 },
-  { month: "Mar", score: 3.2 },
-  { month: "Apr", score: 3.5 },
-  { month: "May", score: 3.8 },
-  { month: "Jun", score: 4.0 },
-  { month: "Jul", score: 4.1 },
-  { month: "Aug", score: 4.2 },
-];
-
-const moodDistribution = [
-  { name: "Happiness", nameAr: "السعادة", value: 28, color: "#22c55e" },
-  { name: "Motivation", nameAr: "الدافعية", value: 18, color: "#f97316" },
-  { name: "Cooperation", nameAr: "التعاون", value: 15, color: "#3b82f6" },
-  { name: "Calmness", nameAr: "الهدوء", value: 12, color: "#6b7280" },
-  { name: "Stress", nameAr: "التوتر", value: 14, color: "#eab308" },
-  { name: "Frustration", nameAr: "الإحباط", value: 8, color: "#ef4444" },
-  { name: "Sadness", nameAr: "الحزن", value: 5, color: "#8b5cf6" },
-];
-
-const yearlyData = [
-  { year: "2023", score: 2.9 },
-  { year: "2024", score: 3.4 },
-  { year: "2025", score: 3.6 },
-];
-
-const stats = [
-  {
-    title: "totalMessages",
-    value: "126",
-    change: "12% from last month",
-    changeType: "positive",
-    icon: MessageSquare,
-  },
-  {
-    title: "avgMoodScore",
-    value: "3.6/5.0",
-    change: "0.4 improvement",
-    changeType: "positive",
-    icon: TrendingUp,
-  },
-  {
-    title: "departments",
-    value: "6",
-    change: "Active departments",
-    changeType: "neutral",
-    icon: Building2,
-  },
-  {
-    title: "issuesFlagged",
-    value: "8",
-    change: "Needs attention",
-    changeType: "negative",
-    icon: AlertCircle,
-  },
-];
-
 const tabs = [
   { id: "dashboard", icon: LayoutDashboard, labelKey: "dashboard" },
   { id: "messages", icon: MessageSquare, labelKey: "messages" },
@@ -113,9 +58,7 @@ export function HRDashboard() {
   return (
     <div className="min-h-screen" dir={language === "ar" ? "rtl" : "ltr"}>
       <Header />
-
       <main className="container mx-auto px-4 py-6">
-        {/* Enhanced Tabs with Framer Motion pill */}
         <div className="mb-8">
           <div className="flex w-full bg-muted rounded-2xl p-1.5">
             {tabs.map((tab) => (
@@ -145,8 +88,6 @@ export function HRDashboard() {
             ))}
           </div>
         </div>
-
-        {/* Tab Content */}
         <motion.div
           key={activeTab}
           initial={{ opacity: 0, y: 10 }}
@@ -166,45 +107,102 @@ function DashboardContent() {
   const { language } = useApp();
   const t = translations[language];
 
-  const localMoodData = moodDistribution.map((d) => ({
+  // ── Real data from backend ───────────────────────────────
+  const [deptData,    setDeptData]    = useState<DepartmentData[]>([]);
+  const [monthlyData, setMonthlyData] = useState<MonthlyData[]>([]);
+  const [moodData,    setMoodData]    = useState<MoodData[]>([]);
+  const [yearlyData,  setYearlyData]  = useState<YearlyData[]>([]);
+  const [statsData,   setStatsData]   = useState<StatsData | null>(null);
+  const [loading,     setLoading]     = useState(true);
+
+  useEffect(() => {
+    async function loadAll() {
+      try {
+        const [stats, depts, monthly, mood, yearly] = await Promise.all([
+          fetchStats(),
+          fetchDepartments(),
+          fetchMonthlyTrends(),
+          fetchMoodDistribution(),
+          fetchYearlyTrends(),
+        ]);
+        setStatsData(stats);
+        setDeptData(depts);
+        setMonthlyData(monthly);
+        setMoodData(mood);
+        setYearlyData(yearly);
+      } catch (error) {
+        console.error("Failed to load dashboard data:", error);
+      } finally {
+        setLoading(false);
+      }
+    }
+    loadAll();
+  }, []);
+
+  // ── Stats cards from real data ───────────────────────────
+  const stats = statsData ? [
+    {
+      title: "totalMessages",
+      value: statsData.totalMessages.toString(),
+      change: "from database",
+      changeType: "positive" as const,
+      icon: MessageSquare,
+    },
+    {
+      title: "avgMoodScore",
+      value: statsData.avgMoodScore,
+      change: "current average",
+      changeType: "positive" as const,
+      icon: TrendingUp,
+    },
+    {
+      title: "departments",
+      value: statsData.departments,
+      change: "Active departments",
+      changeType: "neutral" as const,
+      icon: Building2,
+    },
+    {
+      title: "issuesFlagged",
+      value: statsData.issuesFlagged,
+      change: "Needs attention",
+      changeType: "negative" as const,
+      icon: AlertCircle,
+    },
+  ] : [];
+
+  const localMoodData = moodData.map((d) => ({
     ...d,
     name: language === "ar" ? d.nameAr : d.name,
   }));
 
   const RADIAN = Math.PI / 180;
   const renderInsideLabel = ({
-    cx,
-    cy,
-    midAngle,
-    innerRadius,
-    outerRadius,
-    value,
+    cx, cy, midAngle, innerRadius, outerRadius, value,
   }: {
-    cx: number;
-    cy: number;
-    midAngle: number;
-    innerRadius: number;
-    outerRadius: number;
-    value: number;
+    cx: number; cy: number; midAngle: number;
+    innerRadius: number; outerRadius: number; value: number;
   }) => {
     if (value < 10) return null;
     const radius = innerRadius + (outerRadius - innerRadius) * 0.5;
     const x = cx + radius * Math.cos(-midAngle * RADIAN);
     const y = cy + radius * Math.sin(-midAngle * RADIAN);
     return (
-      <text
-        x={x}
-        y={y}
-        fill="white"
-        textAnchor="middle"
-        dominantBaseline="central"
-        fontSize={11}
-        fontWeight={600}
-      >
+      <text x={x} y={y} fill="white" textAnchor="middle"
+        dominantBaseline="central" fontSize={11} fontWeight={600}>
         {`${value}%`}
       </text>
     );
   };
+
+  // ── Loading spinner ──────────────────────────────────────
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center h-64">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary" />
+      </div>
+    );
+  }
 
   return (
     <motion.div
@@ -212,7 +210,6 @@ function DashboardContent() {
       animate={{ opacity: 1, y: 0 }}
       className="space-y-6"
     >
-      {/* Header */}
       <div>
         <h1 className="text-2xl font-bold text-foreground">
           {t.analyticsDashboard}
@@ -222,52 +219,48 @@ function DashboardContent() {
 
       {/* Stats Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {stats.map((stat, index) => (
-          <motion.div
-            key={stat.title}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: index * 0.1 }}
-          >
-            <Card className="border-0 shadow-md bg-card/90 backdrop-blur-sm cursor-default hover:shadow-lg transition-shadow">
-              <CardContent className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="text-sm text-muted-foreground">
-                    {t[stat.title as keyof typeof t]}
-                  </span>
-                  <stat.icon
-                    className={`h-5 w-5 ${
-                      stat.changeType === "negative"
-                        ? "text-red-500"
-                        : "text-primary"
-                    }`}
-                    strokeWidth={1.5}
-                  />
-                </div>
-                <div className="text-2xl font-bold text-foreground">
-                  {stat.value}
-                </div>
-                <div
-                  className={`text-sm mt-1 flex items-center gap-1 ${
-                    stat.changeType === "positive"
-                      ? "text-green-600"
-                      : stat.changeType === "negative"
-                        ? "text-red-500"
-                        : "text-muted-foreground"
-                  }`}
-                >
-                  {stat.changeType === "positive" && (
-                    <TrendingUp className="h-3 w-3" strokeWidth={1.5} />
-                  )}
-                  {stat.changeType === "negative" && (
-                    <TrendingDown className="h-3 w-3" strokeWidth={1.5} />
-                  )}
-                  {stat.change}
-                </div>
-              </CardContent>
-            </Card>
-          </motion.div>
-        ))}
+        {stats.length === 0 ? (
+          <div className="col-span-4 text-center text-muted-foreground py-8">
+            No data yet — waiting for employees to submit reflections.
+          </div>
+        ) : (
+          stats.map((stat, index) => (
+            <motion.div
+              key={stat.title}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: index * 0.1 }}
+            >
+              <Card className="border-0 shadow-md bg-card/90 backdrop-blur-sm cursor-default hover:shadow-lg transition-shadow">
+                <CardContent className="p-6">
+                  <div className="flex items-center justify-between mb-4">
+                    <span className="text-sm text-muted-foreground">
+                      {t[stat.title as keyof typeof t]}
+                    </span>
+                    <stat.icon
+                      className={`h-5 w-5 ${
+                        stat.changeType === "negative" ? "text-red-500" : "text-primary"
+                      }`}
+                      strokeWidth={1.5}
+                    />
+                  </div>
+                  <div className="text-2xl font-bold text-foreground">
+                    {stat.value}
+                  </div>
+                  <div className={`text-sm mt-1 flex items-center gap-1 ${
+                    stat.changeType === "positive" ? "text-green-600"
+                    : stat.changeType === "negative" ? "text-red-500"
+                    : "text-muted-foreground"
+                  }`}>
+                    {stat.changeType === "positive" && <TrendingUp className="h-3 w-3" strokeWidth={1.5} />}
+                    {stat.changeType === "negative" && <TrendingDown className="h-3 w-3" strokeWidth={1.5} />}
+                    {stat.change}
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))
+        )}
       </div>
 
       {/* Department Comparison */}
@@ -277,26 +270,22 @@ function DashboardContent() {
         </CardHeader>
         <CardContent>
           <div className="h-[300px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={departmentData}>
-                <XAxis dataKey="name" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Legend />
-                <Bar
-                  dataKey="messages"
-                  fill="#614EA9"
-                  name="Message Count"
-                  radius={[4, 4, 0, 0]}
-                />
-                <Bar
-                  dataKey="employees"
-                  fill="#C3B4FF"
-                  name="Employee Count"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            {deptData.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                No department data yet
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={deptData}>
+                  <XAxis dataKey="name" tick={{ fontSize: 12 }} />
+                  <YAxis tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="messages" fill="#614EA9" name="Message Count" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="employees" fill="#C3B4FF" name="Employee Count" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
         </CardContent>
       </Card>
@@ -309,22 +298,28 @@ function DashboardContent() {
           </CardHeader>
           <CardContent>
             <div className="h-[250px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={monthlyData}>
-                  <XAxis dataKey="month" tick={{ fontSize: 12 }} />
-                  <YAxis domain={[0, 5]} tick={{ fontSize: 12 }} />
-                  <Tooltip />
-                  <Legend />
-                  <Line
-                    type="monotone"
-                    dataKey="score"
-                    stroke="#614EA9"
-                    strokeWidth={2}
-                    name="Mood Score"
-                    dot={{ fill: "#614EA9" }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
+              {monthlyData.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No monthly data yet
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <LineChart data={monthlyData}>
+                    <XAxis dataKey="month" tick={{ fontSize: 12 }} />
+                    <YAxis domain={[0, 5]} tick={{ fontSize: 12 }} />
+                    <Tooltip />
+                    <Legend />
+                    <Line
+                      type="monotone"
+                      dataKey="score"
+                      stroke="#614EA9"
+                      strokeWidth={2}
+                      name="Mood Score"
+                      dot={{ fill: "#614EA9" }}
+                    />
+                  </LineChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
@@ -335,61 +330,61 @@ function DashboardContent() {
           </CardHeader>
           <CardContent>
             <div className="h-[300px]">
-              <ResponsiveContainer width="100%" height="100%">
-                <PieChart>
-                  <Pie
-                    data={localMoodData}
-                    cx="50%"
-                    cy="45%"
-                    outerRadius={80}
-                    dataKey="value"
-                    label={renderInsideLabel}
-                    labelLine={false}
-                  >
-                    {localMoodData.map((entry, index) => (
-                      <Cell key={`cell-${index}`} fill={entry.color} />
-                    ))}
-                  </Pie>
-                  <Tooltip formatter={(value) => [`${value}%`]} />
-                  <Legend
-                    wrapperStyle={{ fontSize: "13px", fontWeight: 600 }}
-                    iconSize={10}
-                  />
-                </PieChart>
-              </ResponsiveContainer>
+              {localMoodData.length === 0 ? (
+                <div className="flex items-center justify-center h-full text-muted-foreground">
+                  No mood data yet
+                </div>
+              ) : (
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={localMoodData}
+                      cx="50%"
+                      cy="45%"
+                      outerRadius={80}
+                      dataKey="value"
+                      label={renderInsideLabel}
+                      labelLine={false}
+                    >
+                      {localMoodData.map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip formatter={(value) => [`${value}%`]} />
+                    <Legend wrapperStyle={{ fontSize: "13px", fontWeight: 600 }} iconSize={10} />
+                  </PieChart>
+                </ResponsiveContainer>
+              )}
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Year-over-Year Improvement */}
+      {/* Year-over-Year */}
       <Card className="border-0 shadow-md bg-card/90 backdrop-blur-sm">
         <CardHeader>
           <CardTitle>{t.yoyImprovement}</CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="h-[200px]">
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={yearlyData}>
-                <XAxis dataKey="year" tick={{ fontSize: 12 }} />
-                <YAxis domain={[0, 5]} tick={{ fontSize: 12 }} />
-                <Tooltip />
-                <Legend />
-                <Bar
-                  dataKey="score"
-                  fill="#614EA9"
-                  name="Average Mood Score"
-                  radius={[4, 4, 0, 0]}
-                />
-              </BarChart>
-            </ResponsiveContainer>
+            {yearlyData.length === 0 ? (
+              <div className="flex items-center justify-center h-full text-muted-foreground">
+                No yearly data yet
+              </div>
+            ) : (
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={yearlyData}>
+                  <XAxis dataKey="year" tick={{ fontSize: 12 }} />
+                  <YAxis domain={[0, 5]} tick={{ fontSize: 12 }} />
+                  <Tooltip />
+                  <Legend />
+                  <Bar dataKey="score" fill="#614EA9" name="Average Mood Score" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            )}
           </div>
-
           <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10 flex items-start gap-3">
-            <CheckCircle
-              className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5"
-              strokeWidth={1.5}
-            />
+            <CheckCircle className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" strokeWidth={1.5} />
             <p className="text-sm text-muted-foreground">{t.greatProgress}</p>
           </div>
         </CardContent>
@@ -397,4 +392,3 @@ function DashboardContent() {
     </motion.div>
   );
 }
-
