@@ -230,39 +230,102 @@ export function AuthPage() {
     return true;
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+ const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setAuthError({ type: null, message: "" });
 
     if (!validateForm()) return;
 
-    // Validate login credentials if in login mode
-    if (authMode === "login") {
-      const credentialError = validateLoginCredentials(email, password);
-      if (credentialError.type) {
-        setAuthError(credentialError);
-        triggerShake(["email", "password"]);
-        addToast(credentialError.message, "error");
-        return;
-      }
-    }
+    const BASE_URL = "http://127.0.0.1:8000";
 
-    if (userType === "employee") {
-      setUser({
-        name: authMode === "signup" ? name : registeredUsers[email]?.name || email.split("@")[0],
-        email,
-        department,
-        role: "employee",
-      });
+    if (authMode === "login") {
+      try {
+        const endpoint = userType === "hr"
+          ? `${BASE_URL}/auth/hr/login`
+          : `${BASE_URL}/auth/login`;
+
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ email, password }),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          setAuthError({ type: "general", message: data.detail || "Login failed" });
+          triggerShake(["email", "password"]);
+          addToast(data.detail || "Login failed", "error");
+          return;
+        }
+
+        // ── Save JWT token ──────────────────────────────
+        localStorage.setItem("access_token", data.access_token);
+
+        if (userType === "employee") {
+          setUser({
+            name: email.split("@")[0],
+            email,
+            department,
+            role: "employee",
+          });
+        } else {
+          setUser({
+            name: email.split("@")[0],
+            email,
+            role: "hr",
+            position: "HR Manager",
+            phone: "",
+            bio: "Dedicated HR professional focused on creating a positive and supportive work environment for all employees.",
+          });
+        }
+
+      } catch (error) {
+        setAuthError({ type: "general", message: "Cannot connect to server" });
+        addToast("Cannot connect to server — make sure backend is running", "error");
+      }
+
     } else {
-      setUser({
-        name: authMode === "signup" ? name : registeredUsers[email]?.name || email.split("@")[0],
-        email,
-        role: "hr",
-        position: "HR Manager",
-        phone: "+1 (555) 123-4567",
-        bio: "Dedicated HR professional focused on creating a positive and supportive work environment for all employees.",
-      });
+      // Signup
+      try {
+        const endpoint = userType === "hr"
+          ? `${BASE_URL}/auth/hr/register`
+          : `${BASE_URL}/auth/register`;
+
+        const deptMap: Record<string, string> = {
+          "Accounting Department": "accounting",
+          "Maintenance Department": "maintenance",
+          "HR Department": "human_resources",
+          "IT Department": "it",
+          "Sales Department": "sales",
+          "Marketing Department": "marketing",
+        };
+
+        const body = userType === "hr"
+          ? { name, email, password }
+          : { name, email, password, department_name: deptMap[department] || department.toLowerCase() };
+
+        const response = await fetch(endpoint, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(body),
+        });
+
+        const data = await response.json();
+
+        if (!response.ok) {
+          setAuthError({ type: "general", message: data.detail || "Registration failed" });
+          addToast(data.detail || "Registration failed", "error");
+          return;
+        }
+
+        addToast("Account created! Please verify your email.", "success");
+        setAuthMode("login");
+
+      } catch (error) {
+        setAuthError({ type: "general", message: "Cannot connect to server" });
+        addToast("Cannot connect to server — make sure backend is running", "error");
+      }
     }
   };
 

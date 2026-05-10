@@ -1,6 +1,21 @@
 const BASE_URL = "http://127.0.0.1:8000";
 
-// ── Types matching your frontend exactly ────────────────────
+// ── Auth helpers ─────────────────────────────────────────────
+function getToken(): string {
+  if (typeof window !== "undefined") {
+    return localStorage.getItem("access_token") || "";
+  }
+  return "";
+}
+
+function authHeaders() {
+  return {
+    "Content-Type": "application/json",
+    "Authorization": `Bearer ${getToken()}`,
+  };
+}
+
+// ── Types ────────────────────────────────────────────────────
 export interface DepartmentData {
   name: string;
   messages: number;
@@ -31,7 +46,20 @@ export interface StatsData {
   issuesFlagged: string;
 }
 
-// ── API functions ────────────────────────────────────────────
+export interface MessageInsight {
+  id: string;
+  department: string;
+  emotion: string;
+  employeeCount: number;
+  date: string;
+  themes: string[];
+  aiAnalysis: string;
+  responded: boolean;
+  message: string;
+  response?: string;
+}
+
+// ── HR Dashboard endpoints ───────────────────────────────────
 export async function fetchStats(): Promise<StatsData> {
   const res = await fetch(`${BASE_URL}/api/hr/stats`);
   if (!res.ok) throw new Error("Failed to fetch stats");
@@ -61,23 +89,36 @@ export async function fetchYearlyTrends(): Promise<YearlyData[]> {
   if (!res.ok) throw new Error("Failed to fetch yearly trends");
   return res.json();
 }
-export interface MessageInsight {
-  id: string;
-  department: string;
-  emotion: string;
-  employeeCount: number;
-  date: string;
-  themes: string[];
-  aiAnalysis: string;
-  responded: boolean;
-  message: string;
-  response?: string;
-}
 
+// ── HR Messages ──────────────────────────────────────────────
 export async function fetchMessages(): Promise<MessageInsight[]> {
   const res = await fetch(`${BASE_URL}/api/hr/messages`, {
     headers: authHeaders(),
   });
   if (!res.ok) throw new Error("Failed to fetch messages");
+  return res.json();
+}
+
+// ── HR Profile ───────────────────────────────────────────────
+export async function fetchHRProfile() {
+  const res = await fetch(`${BASE_URL}/api/hr/profile`, {
+    headers: authHeaders(),
+  });
+  if (!res.ok) throw new Error("Failed to fetch profile");
+  return res.json();
+}
+
+export async function updateHRProfile(data: {
+  name?: string;
+  phone?: string;
+  bio?: string;
+  position?: string;
+}) {
+  const res = await fetch(`${BASE_URL}/api/hr/profile`, {
+    method: "PUT",
+    headers: authHeaders(),
+    body: JSON.stringify(data),
+  });
+  if (!res.ok) throw new Error("Failed to update profile");
   return res.json();
 }
