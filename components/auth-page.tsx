@@ -240,9 +240,12 @@ export function AuthPage() {
 
     if (authMode === "login") {
       try {
-        const endpoint = userType === "hr"
-          ? `${BASE_URL}/auth/hr/login`
-          : `${BASE_URL}/auth/login`;
+        const endpoint =
+          userType === "hr"
+            ? `${BASE_URL}/auth/hr/login`
+            : userType === "admin"
+              ? `${BASE_URL}/auth/admin/login`
+              : `${BASE_URL}/auth/login`;
 
         const response = await fetch(endpoint, {
           method: "POST",
@@ -269,6 +272,13 @@ export function AuthPage() {
             department,
             role: "employee",
           });
+        } else if (userType === "admin") {
+          setUser({
+            name: email.split("@")[0],
+            email,
+            role: "admin",
+            position: "System Administrator",
+          });
         } else {
           setUser({
             name: email.split("@")[0],
@@ -287,6 +297,12 @@ export function AuthPage() {
 
     } else {
       // Signup
+      if (userType === "admin") {
+        setAuthError({ type: "general", message: "Admin accounts are created by another admin only." });
+        addToast("Admin accounts are created by another admin only.", "error");
+        setAuthMode("login");
+        return;
+      }
       try {
         const endpoint = userType === "hr"
           ? `${BASE_URL}/auth/hr/register`

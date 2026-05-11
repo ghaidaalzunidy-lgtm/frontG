@@ -191,11 +191,11 @@ async function parseError(res: Response, fallback: string): Promise<string> {
   return fallback;
 }
 
-export async function submitReflection(input_text: string): Promise<ReflectionResponse> {
+export async function submitReflection(input_text: string, selected_emotion?: string | null): Promise<ReflectionResponse> {
   const res = await fetch(`${BASE_URL}/reflections/`, {
     method: "POST",
     headers: authHeaders(),
-    body: JSON.stringify({ input_text, department_id: 0 }),
+    body: JSON.stringify({ input_text, department_id: 0, selected_emotion: selected_emotion || null }),
   });
   if (!res.ok) throw new Error(await parseError(res, "Failed to submit reflection"));
   return res.json();
@@ -208,5 +208,247 @@ export async function predictEmotion(input_text: string): Promise<EmotionPredict
     body: JSON.stringify({ input_text }),
   });
   if (!res.ok) throw new Error(await parseError(res, "Failed to predict emotion"));
+  return res.json();
+}
+
+// ── Admin ─────────────────────────────────────────────────────
+export type AdminRole = "employee" | "hr" | "admin";
+
+export interface AdminUser {
+  employee_id: number;
+  name: string;
+  email: string;
+  role: AdminRole;
+  department_id: number | null;
+  department_name: string | null;
+  is_active: boolean;
+  is_verified: boolean;
+  created_at: string | null;
+}
+
+export interface AdminUserCreate {
+  name: string;
+  email: string;
+  password: string;
+  role: AdminRole;
+  department_name?: string;
+}
+
+export interface AdminUserUpdate {
+  name?: string;
+  email?: string;
+  role?: AdminRole;
+  department_name?: string;
+  is_active?: boolean;
+}
+
+export interface SystemSettingView {
+  key: string;
+  value: number | string | boolean;
+  type: "float" | "int" | "bool" | "string";
+  min: number | null;
+  max: number | null;
+  default: number | string | boolean;
+  description: string | null;
+  updated_at: string | null;
+}
+
+export interface SystemHealth {
+  db_ok: boolean;
+  uptime_seconds: number;
+  disk: { total: number; used: number; free: number };
+  counts: Record<string, number>;
+  recent_login_failures_24h: number;
+  now: string;
+}
+
+export interface ActivityLogEntry {
+  id: number;
+  actor_employee_id: number | null;
+  actor_role: string | null;
+  action: string;
+  target_type: string | null;
+  target_id: string | null;
+  meta: Record<string, unknown> | null;
+  ip: string | null;
+  created_at: string;
+}
+
+export interface ModelInfo {
+  current_model_hub_id: string;
+  cache_root: string;
+  cache_size_bytes: number;
+  device_hint: string;
+}
+
+export async function adminLogin(email: string, password: string): Promise<{ access_token: string; token_type: string }> {
+  const res = await fetch(`${BASE_URL}/auth/admin/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Login failed"));
+  return res.json();
+}
+
+export async function fetchAdminUsers(params: { role?: AdminRole; is_active?: boolean } = {}): Promise<AdminUser[]> {
+  const qs = new URLSearchParams();
+  if (params.role) qs.set("role", params.role);
+  if (params.is_active !== undefined) qs.set("is_active", String(params.is_active));
+  const res = await fetch(`${BASE_URL}/api/admin/users?${qs.toString()}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to fetch users"));
+  return res.json();
+}
+
+export async function createAdminUser(payload: AdminUserCreate): Promise<AdminUser> {
+  const res = await fetch(`${BASE_URL}/api/admin/users`, {
+    method: "POST", headers: authHeaders(), body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to create user"));
+  return res.json();
+}
+
+export async function updateAdminUser(id: number, payload: AdminUserUpdate): Promise<AdminUser> {
+  const res = await fetch(`${BASE_URL}/api/admin/users/${id}`, {
+    method: "PATCH", headers: authHeaders(), body: JSON.stringify(payload),
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to update user"));
+  return res.json();
+}
+
+export async function deactivateAdminUser(id: number): Promise<AdminUser> {
+  const res = await fetch(`${BASE_URL}/api/admin/users/${id}/deactivate`, { method: "POST", headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to deactivate user"));
+  return res.json();
+}
+
+export async function reactivateAdminUser(id: number): Promise<AdminUser> {
+  const res = await fetch(`${BASE_URL}/api/admin/users/${id}/reactivate`, { method: "POST", headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to reactivate user"));
+  return res.json();
+}
+
+export async function fetchAdminSettings(): Promise<SystemSettingView[]> {
+  const res = await fetch(`${BASE_URL}/api/admin/settings`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to fetch settings"));
+  return res.json();
+}
+
+export async function updateAdminSetting(key: string, value: number | string | boolean): Promise<SystemSettingView> {
+  const res = await fetch(`${BASE_URL}/api/admin/settings/${key}`, {
+    method: "PUT", headers: authHeaders(), body: JSON.stringify({ value }),
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to update setting"));
+  return res.json();
+}
+
+export async function fetchAdminHealth(): Promise<SystemHealth> {
+  const res = await fetch(`${BASE_URL}/api/admin/system/health`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to fetch system health"));
+  return res.json();
+}
+
+export async function fetchAdminActivityLogs(params: { actor_role?: string; action?: string; limit?: number; offset?: number } = {}): Promise<ActivityLogEntry[]> {
+  const qs = new URLSearchParams();
+  if (params.actor_role) qs.set("actor_role", params.actor_role);
+  if (params.action) qs.set("action", params.action);
+  if (params.limit !== undefined) qs.set("limit", String(params.limit));
+  if (params.offset !== undefined) qs.set("offset", String(params.offset));
+  const res = await fetch(`${BASE_URL}/api/admin/activity-logs?${qs.toString()}`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to fetch activity logs"));
+  return res.json();
+}
+
+export async function fetchAdminModel(): Promise<ModelInfo> {
+  const res = await fetch(`${BASE_URL}/api/admin/model`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to fetch model info"));
+  return res.json();
+}
+
+export async function updateAdminModel(model_hub_id: string): Promise<{ current_model_hub_id: string; reloaded: boolean }> {
+  const res = await fetch(`${BASE_URL}/api/admin/model`, {
+    method: "POST", headers: authHeaders(), body: JSON.stringify({ model_hub_id }),
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to update model"));
+  return res.json();
+}
+
+export async function downloadAdminBackup(): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/admin/backup`, { method: "POST", headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res, "Backup failed"));
+  const blob = await res.blob();
+  const cd = res.headers.get("content-disposition") || "";
+  const filename = cd.split("filename=")[1]?.replaceAll('"', "").trim() || "moodloop-backup.sql";
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export interface AdminDepartment {
+  department_id: number;
+  name: string;
+  employee_count: number;
+}
+
+export async function fetchAdminDepartments(): Promise<AdminDepartment[]> {
+  const res = await fetch(`${BASE_URL}/api/admin/departments`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to fetch departments"));
+  return res.json();
+}
+
+export async function createAdminDepartment(name: string): Promise<AdminDepartment> {
+  const res = await fetch(`${BASE_URL}/api/admin/departments`, {
+    method: "POST", headers: authHeaders(), body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to create department"));
+  return res.json();
+}
+
+export async function renameAdminDepartment(id: number, name: string): Promise<AdminDepartment> {
+  const res = await fetch(`${BASE_URL}/api/admin/departments/${id}`, {
+    method: "PATCH", headers: authHeaders(), body: JSON.stringify({ name }),
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to rename department"));
+  return res.json();
+}
+
+export async function deleteAdminDepartment(id: number): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/admin/departments/${id}`, {
+    method: "DELETE", headers: authHeaders(),
+  });
+  if (!res.ok && res.status !== 204) throw new Error(await parseError(res, "Failed to delete department"));
+}
+
+export async function downloadAdminMessagesCsv(): Promise<void> {
+  const res = await fetch(`${BASE_URL}/api/admin/messages.csv`, { headers: authHeaders() });
+  if (!res.ok) throw new Error(await parseError(res, "CSV export failed"));
+  const blob = await res.blob();
+  const cd = res.headers.get("content-disposition") || "";
+  const filename = cd.split("filename=")[1]?.replaceAll('"', "").trim() || "moodloop-messages.csv";
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
+export async function restoreAdminBackup(file: File): Promise<{ restored: boolean; pre_restore_backup: string }> {
+  const fd = new FormData();
+  fd.append("file", file);
+  fd.append("confirm", "RESTORE");
+  const res = await fetch(`${BASE_URL}/api/admin/restore`, {
+    method: "POST",
+    headers: { "Authorization": `Bearer ${getToken()}` },
+    body: fd,
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Restore failed"));
   return res.json();
 }

@@ -57,7 +57,7 @@ export function EmployeePortal() {
     setSubmitError(null);
     setPortalState("processing");
     try {
-      const result = await submitReflection(message);
+      const result = await submitReflection(message, selectedEmotion);
       const backendEmotion = (result.predicted_emotion ?? "").toLowerCase();
       setPredictedEmotionId(backendToFrontendEmotionId[backendEmotion] ?? null);
       setConfidence(result.confidence ?? null);
