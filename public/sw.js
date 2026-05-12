@@ -1,84 +1,82 @@
-const CACHE_NAME = 'moodloop-v1';
+const CACHE_NAME = 'moodloop-v2';
 const ASSETS_TO_CACHE = [
   '/',
   '/offline.html',
 ];
 
-// Install event
 self.addEventListener('install', (event) => {
-  console.log('Service Worker installing...');
   event.waitUntil(
     caches.open(CACHE_NAME).then((cache) => {
-      console.log('Cache opened');
       return cache.addAll(ASSETS_TO_CACHE).catch(() => {
-        console.log('Some assets failed to cache');
+        // Some assets may not exist; ignore.
       });
     })
   );
   self.skipWaiting();
 });
 
-// Activate event
 self.addEventListener('activate', (event) => {
-  console.log('Service Worker activating...');
   event.waitUntil(
-    caches.keys().then((cacheNames) => {
-      return Promise.all(
-        cacheNames.map((cacheName) => {
-          if (cacheName !== CACHE_NAME) {
-            console.log('Deleting old cache:', cacheName);
-            return caches.delete(cacheName);
-          }
-        })
-      );
-    })
+    caches.keys().then((cacheNames) =>
+      Promise.all(
+        cacheNames
+          .filter((name) => name !== CACHE_NAME)
+          .map((name) => caches.delete(name))
+      )
+    )
   );
   self.clients.claim();
 });
 
-// Fetch event
 self.addEventListener('fetch', (event) => {
   const { request } = event;
 
-  // Skip non-GET requests
-  if (request.method !== 'GET') {
-    return;
-  }
+  // Only handle GETs.
+  if (request.method !== 'GET') return;
 
-  // Network first strategy for API calls
-  if (request.url.includes('/api/')) {
+  // Only handle same-origin requests. Cross-origin (e.g. the FastAPI
+  // backend on :8000) is left to the browser — intercepting it risks
+  // corrupting CORS preflights and masking real errors as ERR_FAILED.
+  const url = new URL(request.url);
+  if (url.origin !== self.location.origin) return;
+
+  // Same-origin /api/* (none today, but be defensive): network-first,
+  // fall back to cache. Always resolve respondWith to a real Response.
+  if (url.pathname.startsWith('/api/')) {
     event.respondWith(
       fetch(request)
         .then((response) => {
-          const cache = caches.open(CACHE_NAME);
-          cache.then((c) => c.put(request, response.clone()));
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(request, copy)).catch(() => {});
           return response;
         })
-        .catch(() => caches.match(request))
+        .catch(async () => {
+          const cached = await caches.match(request);
+          return cached || new Response('', { status: 503, statusText: 'Offline' });
+        })
     );
     return;
   }
 
-  // Cache first strategy for static assets
+  // Static assets: cache-first, network fallback, never resolve to undefined.
   event.respondWith(
-    caches
-      .match(request)
-      .then((response) => {
-        if (response) {
+    caches.match(request).then((cached) => {
+      if (cached) return cached;
+      return fetch(request)
+        .then((response) => {
+          const copy = response.clone();
+          caches.open(CACHE_NAME).then((c) => c.put(request, copy)).catch(() => {});
           return response;
-        }
-        return fetch(request).then((response) => {
-          const cache = caches.open(CACHE_NAME);
-          cache.then((c) => c.put(request, response.clone()));
-          return response;
+        })
+        .catch(async () => {
+          if (request.destination === 'document') {
+            const offline = await caches.match('/offline.html');
+            if (offline) return offline;
+            const root = await caches.match('/');
+            if (root) return root;
+          }
+          return new Response('', { status: 504, statusText: 'Offline' });
         });
-      })
-      .catch(() => {
-        // Return a placeholder for offline
-        if (request.destination === 'document') {
-          return caches.match('/');
-        }
-      })
+    })
   );
 });
-

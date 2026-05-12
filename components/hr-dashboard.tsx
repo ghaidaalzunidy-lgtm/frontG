@@ -7,11 +7,14 @@ import {
   fetchMonthlyTrends,
   fetchMoodDistribution,
   fetchYearlyTrends,
+  fetchCriticalAlerts,
+  resolveCriticalAlert,
   type DepartmentData,
   type MonthlyData,
   type MoodData,
   type YearlyData,
   type StatsData,
+  type CriticalAlert,
 } from "@/lib/api";
 import { motion } from "framer-motion";
 import {
@@ -23,7 +26,11 @@ import {
   AlertCircle,
   TrendingDown,
   CheckCircle,
+  AlertTriangle,
+  Mail,
 } from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Header } from "@/components/header";
 import { HRMessages } from "@/components/hr-messages";
@@ -113,23 +120,26 @@ function DashboardContent() {
   const [moodData,    setMoodData]    = useState<MoodData[]>([]);
   const [yearlyData,  setYearlyData]  = useState<YearlyData[]>([]);
   const [statsData,   setStatsData]   = useState<StatsData | null>(null);
+  const [alerts,      setAlerts]      = useState<CriticalAlert[]>([]);
   const [loading,     setLoading]     = useState(true);
 
   useEffect(() => {
     async function loadAll() {
       try {
-        const [stats, depts, monthly, mood, yearly] = await Promise.all([
+        const [stats, depts, monthly, mood, yearly, criticalAlerts] = await Promise.all([
           fetchStats(),
           fetchDepartments(),
           fetchMonthlyTrends(),
           fetchMoodDistribution(),
           fetchYearlyTrends(),
+          fetchCriticalAlerts(),
         ]);
         setStatsData(stats);
         setDeptData(depts);
         setMonthlyData(monthly);
         setMoodData(mood);
         setYearlyData(yearly);
+        setAlerts(criticalAlerts);
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
       } finally {
@@ -175,6 +185,34 @@ function DashboardContent() {
     ...d,
     name: language === "ar" ? d.nameAr : d.name,
   }));
+
+  const handleResolveAlert = async (alertId: number) => {
+    try {
+      await resolveCriticalAlert(alertId);
+      setAlerts((prev) => prev.filter((a) => a.alert_id !== alertId));
+      setStatsData((prev) =>
+        prev
+          ? {
+              ...prev,
+              issuesFlagged: String(Math.max(0, Number(prev.issuesFlagged) - 1)),
+            }
+          : prev,
+      );
+    } catch (e) {
+      console.error("Failed to resolve alert:", e);
+    }
+  };
+
+  const formatAlertTime = (iso: string | null): string => {
+    if (!iso) return "";
+    const d = new Date(iso);
+    return d.toLocaleString(language === "ar" ? "ar" : "en-US", {
+      month: "short",
+      day: "numeric",
+      hour: "numeric",
+      minute: "2-digit",
+    });
+  };
 
   const RADIAN = Math.PI / 180;
   const renderInsideLabel = ({
@@ -262,6 +300,95 @@ function DashboardContent() {
           ))
         )}
       </div>
+
+      {/* Critical Keyword Alerts */}
+      {alerts.length > 0 && (
+        <Card className="border-0 shadow-md bg-card/90 backdrop-blur-sm border-l-4 border-l-red-500">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-red-500" strokeWidth={1.5} />
+              <CardTitle className="text-red-600">
+                {language === "ar" ? "تنبيهات حرجة" : "Critical alerts"}
+              </CardTitle>
+              <Badge variant="destructive" className="ml-1">
+                {alerts.length}
+              </Badge>
+            </div>
+            <p className="text-sm text-muted-foreground mt-1">
+              {language === "ar"
+                ? "تم رصد كلمات مفتاحية تستدعي تدخلاً فورياً من قسم الموارد البشرية."
+                : "Keywords indicating possible self-harm or severe distress were detected. Immediate HR follow-up recommended."}
+            </p>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {alerts.map((alert) => (
+              <div
+                key={alert.alert_id}
+                className="rounded-xl border border-red-200/60 bg-red-50/40 dark:bg-red-950/20 p-4"
+              >
+                <div className="flex items-start justify-between gap-3 flex-wrap">
+                  <div className="min-w-0 flex-1 space-y-2">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <span className="font-semibold text-foreground">
+                        {alert.employee_name}
+                      </span>
+                      {alert.department_name && (
+                        <Badge variant="outline" className="text-xs">
+                          {alert.department_name}
+                        </Badge>
+                      )}
+                      <Badge variant="destructive" className="text-xs uppercase">
+                        {alert.severity}
+                      </Badge>
+                      <span className="text-xs text-muted-foreground">
+                        {formatAlertTime(alert.created_at)}
+                      </span>
+                    </div>
+                    <div className="text-sm">
+                      <span className="text-muted-foreground">
+                        {language === "ar" ? "كلمة مرصودة: " : "Matched: "}
+                      </span>
+                      <span
+                        className="font-mono px-1.5 py-0.5 rounded bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300"
+                        dir="rtl"
+                      >
+                        {alert.matched_keyword}
+                      </span>
+                    </div>
+                    <p
+                      className="text-sm text-muted-foreground italic break-words"
+                      dir="rtl"
+                    >
+                      “{alert.snippet}”
+                    </p>
+                  </div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    <a
+                      href={`mailto:?subject=${encodeURIComponent(
+                        language === "ar"
+                          ? "متابعة عاجلة"
+                          : "Urgent wellbeing check-in",
+                      )}`}
+                      className="inline-flex items-center gap-1 text-xs text-primary hover:underline"
+                    >
+                      <Mail className="h-3.5 w-3.5" strokeWidth={1.5} />
+                      {language === "ar" ? "تواصل" : "Reach out"}
+                    </a>
+                    <Button
+                      size="sm"
+                      variant="outline"
+                      onClick={() => handleResolveAlert(alert.alert_id)}
+                      className="cursor-pointer"
+                    >
+                      {language === "ar" ? "تم الحل" : "Mark resolved"}
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
 
       {/* Department Comparison */}
       <Card className="border-0 shadow-md bg-card/90 backdrop-blur-sm">

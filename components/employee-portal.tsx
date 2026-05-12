@@ -2,15 +2,30 @@
 
 import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
-import { Send, Lock, CheckCircle2, Bot } from "lucide-react";
+import { Send, Lock, CheckCircle2, Bot, AlertCircle } from "lucide-react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Header } from "@/components/header";
 import { ProcessingIndicator } from "@/components/loading-screen";
 import { useApp, translations, emotions } from "@/lib/app-context";
+import { submitReflection } from "@/lib/api";
 
 type PortalState = "form" | "processing" | "success";
+
+const MIN_LEN = 100;
+const MAX_LEN = 1000;
+
+// Backend EmotionEnum → frontend emotions[] id
+const backendToFrontendEmotionId: Record<string, string> = {
+  happiness: "happiness",
+  motivation: "motivation",
+  cooperation: "cooperation",
+  neutral: "calmness",
+  stress: "stress",
+  anger: "frustration",
+  sadness: "sadness",
+};
 
 export function EmployeePortal() {
   const { user, language } = useApp();
@@ -19,43 +34,47 @@ export function EmployeePortal() {
   const [selectedEmotion, setSelectedEmotion] = useState<string | null>(null);
   const [message, setMessage] = useState("");
   const [portalState, setPortalState] = useState<PortalState>("form");
-  const [aiResponse, setAiResponse] = useState("");
+  const [predictedEmotionId, setPredictedEmotionId] = useState<string | null>(null);
+  const [confidence, setConfidence] = useState<number | null>(null);
+  const [submitError, setSubmitError] = useState<string | null>(null);
+
+  const charCountClass =
+    message.length === 0
+      ? "text-muted-foreground"
+      : message.length < MIN_LEN || message.length > MAX_LEN
+      ? "text-red-500"
+      : "text-muted-foreground";
+  const lengthValid = message.length >= MIN_LEN && message.length <= MAX_LEN;
+  const canSubmit = !!selectedEmotion && lengthValid && portalState === "form";
+
+  const userEmotion = emotions.find((e) => e.id === selectedEmotion);
+  const aiEmotion = predictedEmotionId
+    ? emotions.find((e) => e.id === predictedEmotionId)
+    : null;
 
   const handleSubmit = async () => {
-    if (!selectedEmotion) return;
-
+    if (!canSubmit) return;
+    setSubmitError(null);
     setPortalState("processing");
-
-    // Simulate AI processing
-    await new Promise((resolve) => setTimeout(resolve, 2000));
-
-    // Generate AI response based on emotion
-    const responses: Record<string, string> = {
-      happiness:
-        "We're thrilled to hear you're feeling positive! Your enthusiasm contributes to our workplace culture. Thank you for sharing the good vibes!",
-      motivation:
-        "Your motivation is inspiring! We appreciate your drive and energy. Keep up the great work!",
-      cooperation:
-        "It's wonderful to hear about positive teamwork! Strong collaboration makes our organization thrive.",
-      calmness:
-        "Thank you for sharing. We value your balanced perspective and appreciate your feedback.",
-      stress:
-        "We're sorry to hear you're experiencing stress. Your well-being matters to us. Our management team will review your feedback to identify ways to help reduce workplace pressure.",
-      frustration:
-        "We're sorry to hear you're experiencing frustration. Your feelings are valid, and we take this seriously. Our management team will review your feedback to address the underlying issues and find solutions.",
-      sadness:
-        "We're concerned about your well-being. Please know that support is available. Our HR team will review this feedback to understand how we can better support you.",
-    };
-
-    setAiResponse(responses[selectedEmotion] || responses.calmness);
-    setPortalState("success");
+    try {
+      const result = await submitReflection(message, selectedEmotion);
+      const backendEmotion = (result.predicted_emotion ?? "").toLowerCase();
+      setPredictedEmotionId(backendToFrontendEmotionId[backendEmotion] ?? null);
+      setConfidence(result.confidence ?? null);
+      setPortalState("success");
+    } catch (e) {
+      setSubmitError(e instanceof Error ? e.message : "Submit failed");
+      setPortalState("form");
+    }
   };
 
   const handleReset = () => {
     setSelectedEmotion(null);
     setMessage("");
     setPortalState("form");
-    setAiResponse("");
+    setPredictedEmotionId(null);
+    setConfidence(null);
+    setSubmitError(null);
   };
 
   return (
@@ -126,8 +145,23 @@ export function EmployeePortal() {
                       onChange={(e) => setMessage(e.target.value)}
                       className="min-h-[120px] resize-none"
                       dir="auto"
+                      maxLength={MAX_LEN + 50}
                     />
+                    <div className="flex justify-between items-center text-xs">
+                      <span className={charCountClass}>
+                        {language === "en"
+                          ? `${message.length} / ${MAX_LEN} characters (min ${MIN_LEN}, Arabic required)`
+                          : `${message.length} / ${MAX_LEN} حرف (الحد الأدنى ${MIN_LEN}، يجب أن يكون باللغة العربية)`}
+                      </span>
+                    </div>
                   </div>
+
+                  {submitError && (
+                    <div className="p-3 rounded-lg bg-red-50 border border-red-200 flex items-start gap-2">
+                      <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0 mt-0.5" />
+                      <p className="text-sm text-red-700">{submitError}</p>
+                    </div>
+                  )}
 
                   {/* Anonymous Notice */}
                   <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10">
@@ -145,7 +179,7 @@ export function EmployeePortal() {
                   {/* Submit Button */}
                   <Button
                     onClick={handleSubmit}
-                    disabled={!selectedEmotion}
+                    disabled={!canSubmit}
                     className="w-full h-12 text-base font-semibold gap-2 cursor-pointer"
                   >
                     <Send className="h-5 w-5" strokeWidth={1.5} />
@@ -182,14 +216,14 @@ export function EmployeePortal() {
                   <ProcessingIndicator
                     text={
                       language === "en"
-                        ? "Rewriting for Anonymity..."
-                        : "إعادة الكتابة للسرية..."
+                        ? "AI analyzing your reflection..."
+                        : "الذكاء الاصطناعي يحلل انعكاسك..."
                     }
                   />
                   <p className="text-sm text-muted-foreground text-center">
                     {language === "en"
-                      ? "AI is processing your feedback to ensure complete anonymity"
-                      : "الذكاء الاصطناعي يعالج ملاحظاتك لضمان السرية الكاملة"}
+                      ? "AraBERT is detecting the emotion in your text"
+                      : "نموذج AraBERT يحلل المشاعر في نصك"}
                   </p>
                 </CardContent>
               </Card>
@@ -226,18 +260,57 @@ export function EmployeePortal() {
                     </p>
                   </div>
 
-                  {/* AI Response */}
-                  <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10">
-                    <div className="flex items-center gap-2 mb-3">
-                      <Bot className="h-5 w-5 text-primary" strokeWidth={1.5} />
-                      <h3 className="font-semibold text-foreground">
-                        {t.aiResponse}
+                  {/* You said vs AI detected */}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div className="p-4 rounded-xl bg-secondary/50 border border-primary/10">
+                      <h3 className="text-xs font-semibold uppercase tracking-wide text-muted-foreground mb-2">
+                        {language === "en" ? "You said" : "ما اخترته"}
                       </h3>
+                      {userEmotion ? (
+                        <div className="flex items-center gap-3">
+                          <span className="text-3xl">{userEmotion.emoji}</span>
+                          <span className="text-sm font-medium text-foreground">
+                            {language === "en" ? userEmotion.label : userEmotion.labelAr}
+                          </span>
+                        </div>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">—</p>
+                      )}
                     </div>
-                    <p className="text-sm text-muted-foreground">
-                      {aiResponse}
-                    </p>
+                    <div className="p-4 rounded-xl bg-primary/5 border border-primary/20">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Bot className="h-4 w-4 text-primary" strokeWidth={1.5} />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-primary">
+                          {language === "en" ? "AI detected" : "اكتشف الذكاء الاصطناعي"}
+                        </h3>
+                      </div>
+                      {aiEmotion ? (
+                        <>
+                          <div className="flex items-center gap-3">
+                            <span className="text-3xl">{aiEmotion.emoji}</span>
+                            <span className="text-sm font-medium text-foreground">
+                              {language === "en" ? aiEmotion.label : aiEmotion.labelAr}
+                            </span>
+                          </div>
+                          {confidence != null && (
+                            <p className="text-xs text-muted-foreground mt-2">
+                              {language === "en" ? "Confidence" : "الثقة"}: {Math.round(confidence * 100)}%
+                            </p>
+                          )}
+                        </>
+                      ) : (
+                        <p className="text-sm text-muted-foreground">—</p>
+                      )}
+                    </div>
                   </div>
+
+                  <Button
+                    onClick={handleReset}
+                    variant="outline"
+                    className="w-full cursor-pointer"
+                  >
+                    {language === "en" ? "Submit another reflection" : "إرسال انعكاس آخر"}
+                  </Button>
                 </CardContent>
               </Card>
 

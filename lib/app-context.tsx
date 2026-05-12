@@ -9,11 +9,11 @@ import {
   useCallback,
 } from "react";
 
-export type UserRole = "employee" | "hr" | null;
-export type AppView = "home" | "login" | "register" | "employee-portal" | "hr-dashboard";
+export type UserRole = "employee" | "hr" | "admin" | null;
+export type AppView = "home" | "login" | "register" | "employee-portal" | "hr-dashboard" | "admin-dashboard";
 export type Language = "en" | "ar";
 export type AuthMode = "login" | "signup";
-export type UserType = "employee" | "hr";
+export type UserType = "employee" | "hr" | "admin";
 
 export interface User {
   name: string;
@@ -86,8 +86,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
         const session = JSON.parse(stored);
         if (session.user) {
           setUserState(session.user);
+          const role = session.user.role;
           setView(
-            session.user.role === "hr" ? "hr-dashboard" : "employee-portal",
+            role === "admin"
+              ? "admin-dashboard"
+              : role === "hr"
+                ? "hr-dashboard"
+                : "employee-portal",
           );
         }
         if (session.language) {
@@ -118,7 +123,13 @@ export function AppProvider({ children }: { children: ReactNode }) {
   const setUser = useCallback((newUser: User | null) => {
     setUserState(newUser);
     if (newUser) {
-      setView(newUser.role === "hr" ? "hr-dashboard" : "employee-portal");
+      setView(
+        newUser.role === "admin"
+          ? "admin-dashboard"
+          : newUser.role === "hr"
+            ? "hr-dashboard"
+            : "employee-portal",
+      );
     }
   }, []);
 
@@ -305,6 +316,43 @@ export const translations = {
     passwordRequired: "Password is required",
     nameRequired: "Name is required",
     departmentRequired: "Please select a department",
+    // Admin
+    adminPortal: "Admin Portal",
+    adminDesc: "Manage users, configuration, and system health",
+    adminReg: "Admin Sign-in",
+    adminDashboard: "Admin Console",
+    users: "Users",
+    settings: "Settings",
+    systemHealth: "System Health",
+    activityLogs: "Activity Logs",
+    exports: "Exports",
+    model: "Model",
+    backupRestore: "Backup & Restore",
+    addDepartment: "Add Department",
+    departmentName: "Department name",
+    exportMessagesCsv: "Export messages (CSV)",
+    exportMessagesDesc:
+      "One row per submission with date, department, encrypted message (Fernet ciphertext — unreadable without the key), the employee-selected emotion, and the model's predicted emotion. No employee identifiers.",
+    newUser: "New User",
+    deactivate: "Deactivate",
+    reactivate: "Reactivate",
+    editUser: "Edit User",
+    active: "Active",
+    inactive: "Inactive",
+    save: "Save",
+    delete: "Delete",
+    currentValue: "Current value",
+    defaultValue: "Default",
+    valueClamped: "Value was clamped to the allowed range.",
+    confirmRestore: "Type RESTORE to confirm",
+    downloadBackup: "Download backup",
+    uploadModel: "Update Model",
+    modelHubId: "Model Hub ID",
+    uptime: "Uptime",
+    diskUsage: "Disk usage",
+    dbStatus: "Database",
+    counts: "Row counts",
+    loginFailures24h: "Login failures (24h)",
   },
   ar: {
     // Auth
@@ -407,6 +455,43 @@ export const translations = {
     passwordRequired: "كلمة المرور مطلوبة",
     nameRequired: "الاسم مطلوب",
     departmentRequired: "يرجى اختيار القسم",
+    // Admin
+    adminPortal: "بوابة المسؤول",
+    adminDesc: "إدارة المستخدمين وإعدادات النظام والصحة العامة",
+    adminReg: "تسجيل دخول المسؤول",
+    adminDashboard: "لوحة المسؤول",
+    users: "المستخدمون",
+    settings: "الإعدادات",
+    systemHealth: "صحة النظام",
+    activityLogs: "سجل النشاط",
+    exports: "التصدير",
+    model: "النموذج",
+    backupRestore: "النسخ الاحتياطي والاستعادة",
+    addDepartment: "إضافة قسم",
+    departmentName: "اسم القسم",
+    exportMessagesCsv: "تصدير الرسائل (CSV)",
+    exportMessagesDesc:
+      "صف لكل مشاركة يحتوي على التاريخ والقسم والرسالة المشفرة (نص Fernet لا يمكن قراءته بدون المفتاح) والمشاعر التي اختارها الموظف وتوقع النموذج. بدون أي معرّفات للموظفين.",
+    newUser: "مستخدم جديد",
+    deactivate: "إلغاء التفعيل",
+    reactivate: "إعادة التفعيل",
+    editUser: "تعديل المستخدم",
+    active: "نشط",
+    inactive: "غير نشط",
+    save: "حفظ",
+    delete: "حذف",
+    currentValue: "القيمة الحالية",
+    defaultValue: "القيمة الافتراضية",
+    valueClamped: "تم تقييد القيمة ضمن النطاق المسموح.",
+    confirmRestore: "اكتب RESTORE للتأكيد",
+    downloadBackup: "تنزيل نسخة احتياطية",
+    uploadModel: "تحديث النموذج",
+    modelHubId: "معرّف النموذج",
+    uptime: "وقت التشغيل",
+    diskUsage: "استخدام القرص",
+    dbStatus: "قاعدة البيانات",
+    counts: "إحصاءات الصفوف",
+    loginFailures24h: "محاولات الدخول الفاشلة (24س)",
   },
 };
 
