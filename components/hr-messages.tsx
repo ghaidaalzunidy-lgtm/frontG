@@ -217,6 +217,15 @@ export function HRMessages() {
     return "border-l-4 border-l-gray-400";
   };
 
+  const emotionPillClass = (emotion: string) => {
+    const cls = classifyEmotion(emotion);
+    if (cls === "positive")
+      return "bg-green-100/80 text-green-900 dark:bg-green-950/40 dark:text-green-200";
+    if (cls === "negative")
+      return "bg-red-100/80 text-red-900 dark:bg-red-950/40 dark:text-red-200";
+    return "bg-secondary/60 text-foreground";
+  };
+
   // Dead respond logic kept intentionally — to be wired or removed in a separate task.
   const handleRespond = (id: string) => {
     if (!responseText.trim()) return;
@@ -525,11 +534,11 @@ export function HRMessages() {
                           {sortedEmotions.map(([emotion, count]) => (
                             <span
                               key={emotion}
-                              className="inline-flex items-center gap-1 text-sm bg-secondary/60 px-2 py-1 rounded-full"
+                              className={`inline-flex items-center gap-1 text-sm px-2 py-1 rounded-full ${emotionPillClass(emotion)}`}
                               title={emotion}
                             >
                               <span>{emotionEmojis[emotion] || "😐"}</span>
-                              <span className="tabular-nums text-xs font-medium text-foreground">
+                              <span className="tabular-nums text-xs font-medium">
                                 {count}
                               </span>
                             </span>
