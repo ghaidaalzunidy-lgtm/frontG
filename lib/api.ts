@@ -139,6 +139,30 @@ export async function resolveCriticalAlert(alertId: number): Promise<void> {
   if (!res.ok) throw new Error("Failed to resolve alert");
 }
 
+// ── Department alarms (HR only) ──────────────────────────────
+// Aggregated 7-day per-department severity rollups produced by the daily
+// scheduler in MOODLOOP-backedn/app/utils/alarm.py. Backend gates the route
+// hr_only; admins cannot read this without a backend change. The `message`
+// column on the underlying table is intentionally NOT exposed here — it's
+// English-only; the UI renders structured fields and localizes labels.
+export interface DepartmentAlarm {
+  alarm_id: number;
+  department_id: number;
+  department_name: string | null;
+  severity: "low" | "medium" | "high" | "critical";
+  negative_ratio: number;
+  analyses_count: number;
+  window_start: string | null;
+  window_end: string | null;
+  created_at: string | null;
+}
+
+export async function fetchDepartmentAlarms(): Promise<DepartmentAlarm[]> {
+  const res = await fetch(`${BASE_URL}/alarms/`, { headers: authHeaders() });
+  if (!res.ok) throw new Error("Failed to fetch department alarms");
+  return res.json();
+}
+
 // ── HR Profile ───────────────────────────────────────────────
 export async function fetchHRProfile() {
   const res = await fetch(`${BASE_URL}/api/hr/profile`, {

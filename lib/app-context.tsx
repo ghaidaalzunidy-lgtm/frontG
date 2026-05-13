@@ -353,6 +353,16 @@ export const translations = {
     dbStatus: "Database",
     counts: "Row counts",
     loginFailures24h: "Login failures (24h)",
+    // ── Department alarms (HR dashboard) ─────────────────────
+    departmentAlarms:    "Department alarms",
+    noActiveAlarms:      "No active department alarms",
+    negativeLabel:       "negative",
+    analysesLabel:       "analyses",
+    last7Days:           "Last 7 days",
+    severityLow:         "Low",
+    severityMedium:      "Medium",
+    severityHigh:        "High",
+    severityCritical:    "Critical",
   },
   ar: {
     // Auth
@@ -492,6 +502,16 @@ export const translations = {
     dbStatus: "قاعدة البيانات",
     counts: "إحصاءات الصفوف",
     loginFailures24h: "محاولات الدخول الفاشلة (24س)",
+    // ── تنبيهات الأقسام (لوحة الموارد البشرية) ─────────────────────
+    departmentAlarms:    "تنبيهات الأقسام",
+    noActiveAlarms:      "لا توجد تنبيهات نشطة",
+    negativeLabel:       "سلبي",
+    analysesLabel:       "تحليل",
+    last7Days:           "آخر 7 أيام",
+    severityLow:         "منخفض",
+    severityMedium:      "متوسط",
+    severityHigh:        "مرتفع",
+    severityCritical:    "حرج",
   },
 };
 

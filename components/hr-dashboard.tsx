@@ -9,12 +9,14 @@ import {
   fetchYearlyTrends,
   fetchCriticalAlerts,
   resolveCriticalAlert,
+  fetchDepartmentAlarms,
   type DepartmentData,
   type MonthlyData,
   type MoodData,
   type YearlyData,
   type StatsData,
   type CriticalAlert,
+  type DepartmentAlarm,
 } from "@/lib/api";
 import { motion } from "framer-motion";
 import {
@@ -121,18 +123,20 @@ function DashboardContent() {
   const [yearlyData,  setYearlyData]  = useState<YearlyData[]>([]);
   const [statsData,   setStatsData]   = useState<StatsData | null>(null);
   const [alerts,      setAlerts]      = useState<CriticalAlert[]>([]);
+  const [alarms,      setAlarms]      = useState<DepartmentAlarm[]>([]);
   const [loading,     setLoading]     = useState(true);
 
   useEffect(() => {
     async function loadAll() {
       try {
-        const [stats, depts, monthly, mood, yearly, criticalAlerts] = await Promise.all([
+        const [stats, depts, monthly, mood, yearly, criticalAlerts, deptAlarms] = await Promise.all([
           fetchStats(),
           fetchDepartments(),
           fetchMonthlyTrends(),
           fetchMoodDistribution(),
           fetchYearlyTrends(),
           fetchCriticalAlerts(),
+          fetchDepartmentAlarms(),
         ]);
         setStatsData(stats);
         setDeptData(depts);
@@ -140,6 +144,7 @@ function DashboardContent() {
         setMoodData(mood);
         setYearlyData(yearly);
         setAlerts(criticalAlerts);
+        setAlarms(deptAlarms);
       } catch (error) {
         console.error("Failed to load dashboard data:", error);
       } finally {
@@ -148,6 +153,33 @@ function DashboardContent() {
     }
     loadAll();
   }, []);
+
+  // ── Department-alarm display helpers ─────────────────────
+  const formatAlarmDate = (iso: string | null): string => {
+    if (!iso) return "—";
+    return new Date(iso).toLocaleDateString(language === "ar" ? "ar" : "en", {
+      month: "short",
+      day:   "numeric",
+    });
+  };
+
+  const severityClasses = (s: DepartmentAlarm["severity"]): string => {
+    switch (s) {
+      case "critical": return "bg-red-600 hover:bg-red-700 text-white";
+      case "high":     return "bg-orange-500 hover:bg-orange-600 text-white";
+      case "medium":   return "bg-amber-500 hover:bg-amber-600 text-white";
+      case "low":      return "bg-yellow-400 hover:bg-yellow-500 text-yellow-950";
+    }
+  };
+
+  const severityLabel = (s: DepartmentAlarm["severity"]): string => {
+    switch (s) {
+      case "critical": return t.severityCritical;
+      case "high":     return t.severityHigh;
+      case "medium":   return t.severityMedium;
+      case "low":      return t.severityLow;
+    }
+  };
 
   // ── Stats cards from real data ───────────────────────────
   const stats = statsData ? [
@@ -383,6 +415,48 @@ function DashboardContent() {
                       {language === "ar" ? "تم الحل" : "Mark resolved"}
                     </Button>
                   </div>
+                </div>
+              </div>
+            ))}
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Department Alarms (sentiment-ratio rollups) */}
+      {alarms.length > 0 && (
+        <Card className="border-0 shadow-md bg-card/90 backdrop-blur-sm border-l-4 border-l-amber-500">
+          <CardHeader>
+            <div className="flex items-center gap-2">
+              <AlertTriangle className="h-5 w-5 text-amber-500" strokeWidth={1.5} />
+              <CardTitle className="text-amber-700 dark:text-amber-400">
+                {t.departmentAlarms}
+              </CardTitle>
+              <Badge variant="secondary" className="ml-1">
+                {alarms.length}
+              </Badge>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            {alarms.map((alarm) => (
+              <div
+                key={alarm.alarm_id}
+                className="rounded-xl border border-amber-200/60 bg-amber-50/40 dark:bg-amber-950/20 p-4"
+              >
+                <div className="flex items-center gap-2 flex-wrap">
+                  <span className="font-semibold text-foreground">
+                    {alarm.department_name ?? "—"}
+                  </span>
+                  <Badge className={`text-xs uppercase ${severityClasses(alarm.severity)}`}>
+                    {severityLabel(alarm.severity)}
+                  </Badge>
+                </div>
+                <div className="mt-2 text-sm text-muted-foreground">
+                  {Math.round(alarm.negative_ratio * 100)}% {t.negativeLabel}
+                  {" · "}
+                  {alarm.analyses_count} {t.analysesLabel}
+                </div>
+                <div className="mt-1 text-xs text-muted-foreground">
+                  {t.last7Days} · {formatAlarmDate(alarm.window_start)} — {formatAlarmDate(alarm.window_end)}
                 </div>
               </div>
             ))}
