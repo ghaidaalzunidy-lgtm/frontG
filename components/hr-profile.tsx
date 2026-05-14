@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Pencil, Mail, Phone, Briefcase, User, X, Check } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,30 +19,12 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 
-import { fetchHRProfile, updateHRProfile } from "@/lib/api";
-
-
 export function HRProfile() {
   const { language, addToast } = useApp();
   const { user, updateUser } = useUser();
   const t = translations[language];
 
-   useEffect(() => {
-    fetchHRProfile()
-      .then((data) => {
-        updateUser({
-          name:     data.name,
-          email:    data.email,
-          position: data.position,
-          phone:    data.phone,
-          bio:      data.bio,
-        });
-      })
-      .catch(console.error);
-  }, []);
-
   const [isEditing, setIsEditing] = useState(false);
-
   const [editName, setEditName] = useState(user?.name || "");
   const [editPhone, setEditPhone] = useState(user?.phone || "");
   const [editBio, setEditBio] = useState(user?.bio || "");
@@ -68,28 +50,16 @@ export function HRProfile() {
     setIsEditing(true);
   };
 
-  const handleSave = async () => {
-    try {
-      await updateHRProfile({
-        name:     editName,
-        phone:    editPhone,
-        bio:      editBio,
-        position: editPosition,
-      });
-      updateUser({
-        name:     editName,
-        phone:    editPhone,
-        bio:      editBio,
-        position: editPosition,
-        department: editDepartment,
-      });
-      addToast("Profile updated successfully", "success");
-      setIsEditing(false);
-    } catch (error) {
-      addToast("Failed to update profile", "error");
-    }
+  const handleSave = () => {
+    updateUser({
+      name: editName,
+      phone: editPhone,
+      bio: editBio,
+      position: editPosition,
+      department: editDepartment,
+    });
+    setIsEditing(false);
   };
-  
 
   const handleCancel = () => {
     setIsEditing(false);

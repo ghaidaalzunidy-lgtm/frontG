@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Users, Building2, Shield, ArrowRight, Languages, ArrowLeft } from "lucide-react";
+import { Users, Building2, ArrowRight, Languages, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useApp, translations } from "@/lib/app-context";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -30,7 +30,7 @@ export function HomePage() {
       ? "linear-gradient(-45deg, #614EA9, #3d3a5a, #2C2A4A, #4a477a, #5d4fa9)"
       : "linear-gradient(-45deg, #C3B4FF, #D4CCFF, #E8EAF6, #EDE9FF, #B8AEEE)";
 
-  const handleSelectRole = (role: "employee" | "hr" | "admin") => {
+  const handleSelectRole = (role: "employee" | "hr") => {
     setUserType(role);
     setAuthMode("login");
     setView("login");
@@ -251,35 +251,6 @@ export function HomePage() {
                       <motion.div
                         animate={{ x: [0, 4, 0] }}
                         transition={{ repeat: Infinity, duration: 2, delay: 0.2 }}
-                      >
-                        <ArrowRight
-                          className="h-5 w-5 text-[#614EA9] group-hover:text-[#2C2A4A] transition-colors flex-shrink-0"
-                          strokeWidth={2}
-                        />
-                      </motion.div>
-                    </motion.button>
-
-                    {/* Admin Portal */}
-                    <motion.button
-                      whileHover={{ scale: 1.02, y: -2 }}
-                      whileTap={{ scale: 0.98 }}
-                      onClick={() => handleSelectRole("admin")}
-                      className="w-full p-4 rounded-2xl border-2 border-gray-200 dark:border-gray-700 hover:border-[#614EA9] transition-all group text-left flex items-center gap-4 cursor-pointer bg-gray-50 dark:bg-gray-800/30 hover:bg-gray-100 dark:hover:bg-gray-700/50"
-                    >
-                      <div className="w-12 h-12 rounded-xl bg-secondary flex items-center justify-center flex-shrink-0">
-                        <Shield className="h-6 w-6 text-[#614EA9]" strokeWidth={1.5} />
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <h3 className="font-semibold text-[#2C2A4A] dark:text-white text-sm group-hover:text-[#614EA9] transition-colors">
-                          {t.adminPortal || "Admin Portal"}
-                        </h3>
-                        <p className="text-xs text-gray-600 dark:text-gray-400 truncate">
-                          {t.adminDesc || "Manage users, configuration, and system health"}
-                        </p>
-                      </div>
-                      <motion.div
-                        animate={{ x: [0, 4, 0] }}
-                        transition={{ repeat: Infinity, duration: 2, delay: 0.4 }}
                       >
                         <ArrowRight
                           className="h-5 w-5 text-[#614EA9] group-hover:text-[#2C2A4A] transition-colors flex-shrink-0"

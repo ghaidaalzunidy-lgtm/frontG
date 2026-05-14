@@ -8,9 +8,8 @@ import { HomePage } from "@/components/home-page"
 import { AuthPage } from "@/components/auth-page"
 import { EmployeePortal } from "@/components/employee-portal"
 import { HRDashboard } from "@/components/hr-dashboard"
-import { AdminDashboard } from "@/components/admin-dashboard"
 import { ToastContainer } from "@/components/toast"
-
+import { VerifyEmailSuccess } from "@/components/verify-email-success"
 function AppContent() {
   const { view, isLoading } = useApp()
   const [initialLoading, setInitialLoading] = useState(true)
@@ -41,7 +40,7 @@ function AppContent() {
           {view === "register" && <AuthPage />}
           {view === "employee-portal" && <EmployeePortal />}
           {view === "hr-dashboard" && <HRDashboard />}
-          {view === "admin-dashboard" && <AdminDashboard />}
+          {view === "verify-email" && <VerifyEmailSuccess />}
         </motion.div>
       </AnimatePresence>
       <ToastContainer />

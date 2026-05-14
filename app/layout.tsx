@@ -3,6 +3,7 @@ import { Outfit } from "next/font/google";
 import { Analytics } from "@vercel/analytics/next";
 import { ThemeProvider } from "@/components/theme-provider";
 import { PWARegister } from "@/components/pwa-register";
+import { AppProvider } from "@/lib/app-context";
 import "./globals.css";
 
 const outfit = Outfit({
@@ -59,8 +60,10 @@ export default function RootLayout({
     <html lang="en" className={outfit.variable}>
       <body className="font-sans antialiased min-h-screen">
         <ThemeProvider attribute="class" defaultTheme="light" enableSystem>
-          <PWARegister />
-          {children}
+          <AppProvider>
+            <PWARegister />
+            {children}
+          </AppProvider>
         </ThemeProvider>
         <Analytics />
       </body>
