@@ -476,3 +476,45 @@ export async function restoreAdminBackup(file: File): Promise<{ restored: boolea
   if (!res.ok) throw new Error(await parseError(res, "Restore failed"));
   return res.json();
 }
+
+// ── Password Reset (public, no auth) ─────────────────────────
+// POST /auth/forgot-password — always returns a generic success message
+// (the backend deliberately returns the same response whether the email
+// exists or not, to prevent account enumeration). If the email is
+// registered, the user gets a reset link by email.
+export async function forgotPassword(email: string): Promise<{ message: string }> {
+  const res = await fetch(`${BASE_URL}/auth/forgot-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to send reset email"));
+  return res.json();
+}
+
+// POST /auth/reset-password — exchanges the token from the email link
+// (plus a new password) for a password change. Token is single-use and
+// expires 1 hour after issue.
+export async function resetPassword(
+  token: string,
+  new_password: string,
+): Promise<{ message: string }> {
+  const res = await fetch(`${BASE_URL}/auth/reset-password`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ token, new_password }),
+  });
+  if (!res.ok) throw new Error(await parseError(res, "Failed to reset password"));
+  return res.json();
+}
+
+// ── Email Verification (public, no auth) ─────────────────────
+// GET /auth/verify-email?token=... — flips `is_verified` to true so the
+// user can log in. Token is single-use; the backend clears it after.
+export async function verifyEmail(token: string): Promise<{ message: string }> {
+  const url = new URL(`${BASE_URL}/auth/verify-email`);
+  url.searchParams.set("token", token);
+  const res = await fetch(url.toString(), { method: "GET" });
+  if (!res.ok) throw new Error(await parseError(res, "Verification failed"));
+  return res.json();
+}    
