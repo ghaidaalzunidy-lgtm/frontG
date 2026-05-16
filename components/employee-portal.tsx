@@ -36,6 +36,7 @@ export function EmployeePortal() {
   const [portalState, setPortalState] = useState<PortalState>("form");
   const [predictedEmotionId, setPredictedEmotionId] = useState<string | null>(null);
   const [confidence, setConfidence] = useState<number | null>(null);
+  const [wellnessTip, setWellnessTip] = useState<string | null>(null);
   const [submitError, setSubmitError] = useState<string | null>(null);
 
   const charCountClass =
@@ -61,6 +62,7 @@ export function EmployeePortal() {
       const backendEmotion = (result.predicted_emotion ?? "").toLowerCase();
       setPredictedEmotionId(backendToFrontendEmotionId[backendEmotion] ?? null);
       setConfidence(result.confidence ?? null);
+       setWellnessTip(result.wellness_tip ?? null);
       setPortalState("success");
     } catch (e) {
       setSubmitError(e instanceof Error ? e.message : "Submit failed");
@@ -74,6 +76,7 @@ export function EmployeePortal() {
     setPortalState("form");
     setPredictedEmotionId(null);
     setConfidence(null);
+    setWellnessTip(null);
     setSubmitError(null);
   };
 
@@ -303,6 +306,20 @@ export function EmployeePortal() {
                       )}
                     </div>
                   </div>
+
+                  {wellnessTip && (
+                    <div className="mt-4 p-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900">
+                      <div className="flex items-center gap-2 mb-2">
+                        <Bot className="h-4 w-4 text-emerald-600 dark:text-emerald-400" strokeWidth={1.5} />
+                        <h3 className="text-xs font-semibold uppercase tracking-wide text-emerald-700 dark:text-emerald-400">
+                          {language === "en" ? "Wellness Tip" : "نصيحة للعافية"}
+                        </h3>
+                      </div>
+                      <p className="text-sm text-foreground leading-relaxed" dir="rtl">
+                        {wellnessTip}
+                      </p>
+                    </div>
+                  )} 
 
                   <Button
                     onClick={handleReset}
