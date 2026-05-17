@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { forgotPassword } from "@/lib/api";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   Users,
@@ -87,6 +88,7 @@ export function AuthPage() {
   const [showForgotPassword, setShowForgotPassword] = useState(false);
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState("");
   const [forgotPasswordStep, setForgotPasswordStep] = useState<"email" | "reset-code" | "new-password" | "success">("email");
+  const [isSendingReset, setIsSendingReset] = useState(false); 
   const [resetCode, setResetCode] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [newPasswordConfirm, setNewPasswordConfirm] = useState("");
@@ -357,8 +359,8 @@ export function AuthPage() {
     transition: { duration: 0.4 },
   };
 
-  // Forgot Password Handlers
-  const handleSendResetLink = () => {
+// Forgot Password Handlers
+  const handleSendResetLink = async () => {
     if (!forgotPasswordEmail.trim()) {
       addToast(
         language === "en" ? "Please enter your email" : "يرجى إدخال بريدك الإلكتروني",
@@ -375,25 +377,34 @@ export function AuthPage() {
       return;
     }
 
-    if (!registeredUsers[forgotPasswordEmail]) {
+    try {
+      setIsSendingReset(true);
+      // Backend always returns a generic success message regardless of
+      // whether the email is registered (to prevent account enumeration).
+      // We mirror that here — if the email exists, the user gets a reset
+      // link; if not, they see the same "check your email" screen.
+      await forgotPassword(forgotPasswordEmail);
       addToast(
         language === "en"
-          ? "This email is not registered"
-          : "هذا البريد الإلكتروني غير مسجل",
+          ? "If that email is registered, a reset link has been sent."
+          : "إذا كان البريد الإلكتروني مسجلاً، فقد تم إرسال رابط إعادة التعيين.",
+        "success"
+      );
+      // Skip the 6-digit code step — the user resets via the email link
+      // which lands them on /reset-password with the token in the URL.
+      setForgotPasswordStep("success");
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : "Network error";
+      addToast(
+        language === "en"
+          ? `Could not send reset email: ${msg}`
+          : `تعذر إرسال البريد الإلكتروني: ${msg}`,
         "error"
       );
-      return;
+    } finally {
+      setIsSendingReset(false);
     }
-
-    // Simulate sending reset link
-    addToast(
-      language === "en"
-        ? "Reset link sent! Check your email."
-        : "تم إرسال رابط إعادة التعيين! تحقق من بريدك الإلكتروني.",
-      "success"
-    );
-    setForgotPasswordStep("reset-code");
-  };
+  }; 
 
   const handleVerifyResetCode = () => {
     if (!resetCode.trim()) {
@@ -980,7 +991,7 @@ export function AuthPage() {
               className="fixed inset-0 bg-black/40 z-40"
             />
 
-            {/* Modal */}
+           {/* Modal */}
             <motion.div
               initial={{ opacity: 0, scale: 0.95, y: 20 }}
               animate={{ opacity: 1, scale: 1, y: 0 }}
@@ -996,8 +1007,8 @@ export function AuthPage() {
                     <h2 className="text-xl font-semibold text-foreground">
                       {forgotPasswordStep === "success"
                         ? language === "en"
-                          ? "Password Updated!"
-                          : "تم تحديث كلمة المرور!"
+                          ? "Check Your Email"
+                          : "تحقق من بريدك الإلكتروني"
                         : language === "en"
                           ? "Reset Your Password"
                           : "إعادة تعيين كلمة المرور"}
@@ -1017,11 +1028,11 @@ export function AuthPage() {
                           : "أنشئ كلمة مرور جديدة")}
                       {forgotPasswordStep === "success" &&
                         (language === "en"
-                          ? "Your password has been successfully updated!"
-                          : "تم تحديث كلمة المرور بنجاح!")}
+                          ? "If that email is registered, we sent a reset link. It expires in 1 hour."
+                          : "إذا كان البريد الإلكتروني مسجلاً، فقد أرسلنا رابط إعادة تعيين. تنتهي صلاحيته خلال ساعة واحدة.")}
                     </p>
                   </div>
-
+                  
                   {/* Email Step */}
                   {forgotPasswordStep === "email" && (
                     <motion.div
@@ -1029,7 +1040,7 @@ export function AuthPage() {
                       animate={{ opacity: 1, y: 0 }}
                       className="space-y-4"
                     >
-                      <div className="space-y-2">
+                  <div className="space-y-2">
                         <Label htmlFor="forgot-email">
                           {language === "en" ? "Email Address" : "عنوان البريد الإلكتروني"}
                         </Label>
@@ -1039,16 +1050,24 @@ export function AuthPage() {
                           placeholder="your.email@company.com"
                           value={forgotPasswordEmail}
                           onChange={(e) => setForgotPasswordEmail(e.target.value)}
+                          onKeyDown={(e) => {
+                            if (e.key === "Enter" && !isSendingReset) {
+                              e.preventDefault();
+                              handleSendResetLink();
+                            }
+                          }}
+                          disabled={isSendingReset}
                           className="focus-visible:ring-[#614EA9]"
                         />
                       </div>
                       <Button
                         onClick={handleSendResetLink}
+                        disabled={isSendingReset}
                         className="w-full bg-[#614EA9] hover:bg-[#7B5FB2] text-white"
                       >
-                        {language === "en"
-                          ? "Send Reset Link"
-                          : "إرسال رابط إعادة التعيين"}
+                        {isSendingReset
+                          ? language === "en" ? "Sending..." : "جارٍ الإرسال..."
+                          : language === "en" ? "Send Reset Link" : "إرسال رابط إعادة التعيين"}
                       </Button>
                     </motion.div>
                   )}
